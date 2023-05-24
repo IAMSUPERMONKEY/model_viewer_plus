@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'model_viewer_plus_stub.dart'
     if (dart.library.io) 'model_viewer_plus_mobile.dart'
@@ -26,7 +26,7 @@ enum InteractionPromptStyle { wiggle, basic }
 
 class JavascriptChannel {
   final String name;
-  final void Function(JavaScriptMessage) onMessageReceived;
+  final void Function(List<dynamic>) onMessageReceived;
 
   JavascriptChannel(this.name, {required this.onMessageReceived});
 }
@@ -626,7 +626,7 @@ class ModelViewer extends StatefulWidget {
   /// Passthrough to `onWebViewCreated` in the underlying `WebView`.
   ///
   /// Called *after* the logic that initializes the model-viewer.
-  final Function(WebViewController controller)? onWebViewCreated;
+  final Function(InAppWebViewController controller)? onWebViewCreated;
 
   @override
   State<ModelViewer> createState() => ModelViewerState();

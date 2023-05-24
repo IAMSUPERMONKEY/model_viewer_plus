@@ -10,7 +10,8 @@ dependencies:
     sdk: flutter
   model_viewer_plus:
     path: ../
-  cupertino_icons: ^0.1.3
+  flutter_inappwebview: ^6.0.0-beta.23
+#  cupertino_icons: ^0.1.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

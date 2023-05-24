@@ -9,27 +9,33 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart'
-    as android;
-import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart'
-    as ios;
 
 import 'html_builder.dart';
 import 'model_viewer_plus.dart';
 
 class ModelViewerState extends State<ModelViewer> {
-  WebViewController? _controller;
+  late InAppWebViewController? _controller;
 
   HttpServer? _proxy;
   late String _proxyURL;
 
+  InAppWebViewSettings settings = InAppWebViewSettings(
+      cacheEnabled: false,
+      clearCache: true,
+      useOnLoadResource: true,
+      transparentBackground: true,
+      clearSessionCache: true,
+      useHybridComposition: true,
+      javaScriptEnabled: true,
+      useShouldOverrideUrlLoading: true);
+
   @override
   void initState() {
     super.initState();
-    _initProxy().then((value) => _initController());
+    _initProxy();
   }
 
   @override
@@ -49,20 +55,109 @@ class ModelViewerState extends State<ModelViewer> {
 
   @override
   Widget build(final BuildContext context) {
-    final webViewController = _controller;
-    if (_proxy == null || webViewController == null) {
+    if (_proxy == null) {
       return Center(
         child: CircularProgressIndicator(
           semanticsLabel: 'Loading Model Viewer...',
         ),
       );
     } else {
-      return WebViewWidget(
-        controller: webViewController,
+      return InAppWebView(
+        initialSettings: settings,
+        onWebViewCreated: (controller) async {
+          _controller = controller;
+
+          widget.javascriptChannels?.forEach((element) {
+            _controller!.addJavaScriptHandler(
+              handlerName: element.name,
+              callback: element.onMessageReceived,
+            );
+          });
+
+          debugPrint('>>>> ModelViewer initializing... <$_proxyURL>'); // DEBUG
+          widget.onWebViewCreated?.call(_controller!);
+          await _controller!
+              .loadUrl(urlRequest: URLRequest(url: WebUri(_proxyURL)));
+        },
         gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
           Factory<OneSequenceGestureRecognizer>(
             () => EagerGestureRecognizer(),
           ),
+        },
+        shouldOverrideUrlLoading: (InAppWebViewController controller,
+            NavigationAction navigationAction) async {
+          debugPrint(
+              '>>>> ModelViewer wants to load: <${navigationAction.request}>'); // DEBUG
+          if (!Platform.isAndroid) {
+            if (Platform.isIOS &&
+                navigationAction.request.url == widget.iosSrc) {
+              // TODO: Migrate to launchUrl()
+              await launch(
+                navigationAction.request.url!.uriValue.toString(),
+                forceSafariVC: true,
+              );
+              return NavigationActionPolicy.CANCEL;
+            }
+            return NavigationActionPolicy.ALLOW;
+          }
+          if (!navigationAction.request.url!.uriValue
+              .toString()
+              .startsWith("intent://")) {
+            return NavigationActionPolicy.ALLOW;
+          }
+          try {
+            // Original, just keep as a backup
+            // See: https://developers.google.com/ar/develop/java/scene-viewer
+            // final intent = android_content.AndroidIntent(
+            //   action: "android.intent.action.VIEW", // Intent.ACTION_VIEW
+            //   data: "https://arvr.google.com/scene-viewer/1.0",
+            //   arguments: <String, dynamic>{
+            //     'file': widget.src,
+            //     'mode': 'ar_preferred',
+            //   },
+            //   package: "com.google.ar.core",
+            //   flags: <int>[
+            //     Flag.FLAG_ACTIVITY_NEW_TASK
+            //   ], // Intent.FLAG_ACTIVITY_NEW_TASK,
+            // );
+
+            // 2022-03-14 update
+            final String fileURL;
+            if (['http', 'https'].contains(Uri.parse(widget.src).scheme)) {
+              fileURL = widget.src;
+            } else {
+              fileURL = p.joinAll([_proxyURL, 'model']);
+            }
+            final intent = android_content.AndroidIntent(
+              action: "android.intent.action.VIEW",
+              // Intent.ACTION_VIEW
+              // See https://developers.google.com/ar/develop/scene-viewer#3d-or-ar
+              // data should be something like "https://arvr.google.com/scene-viewer/1.0?file=https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF/Avocado.gltf"
+              data: Uri(
+                  scheme: 'https',
+                  host: 'arvr.google.com',
+                  path: '/scene-viewer/1.0',
+                  queryParameters: {
+                    // 'title': '', // TODO: maybe set by the user
+                    // TODO: further test, and make it 'ar_preferred'
+                    'mode': 'ar_preferred',
+                    'file': fileURL,
+                  }).toString(),
+              // package changed to com.google.android.googlequicksearchbox
+              // to support the widest possible range of devices
+              package: "com.google.android.googlequicksearchbox",
+              arguments: <String, dynamic>{
+                'browser_fallback_url':
+                    'market://details?id=com.google.android.googlequicksearchbox'
+              },
+            );
+            await intent.launch().onError((error, stackTrace) {
+              debugPrint('>>>> ModelViewer Intent Error: $error'); // DEBUG
+            });
+          } catch (error) {
+            debugPrint('>>>> ModelViewer failed to launch AR: $error'); // DEBUG
+          }
+          return NavigationActionPolicy.CANCEL;
         },
       );
     }
@@ -134,112 +229,6 @@ class ModelViewerState extends State<ModelViewer> {
       id: widget.id,
       debugLogging: widget.debugLogging,
     );
-  }
-
-  Future<void> _initController() async {
-    late final PlatformWebViewControllerCreationParams params;
-    if (Platform.isAndroid) {
-      params = android.AndroidWebViewControllerCreationParams();
-    } else if (Platform.isIOS) {
-      params = ios.WebKitWebViewControllerCreationParams(
-        allowsInlineMediaPlayback: true,
-      );
-    } else {
-      params = const PlatformWebViewControllerCreationParams();
-    }
-    final webViewController =
-        WebViewController.fromPlatformCreationParams(params);
-
-    webViewController
-      ..setBackgroundColor(Colors.transparent)
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onNavigationRequest: (NavigationRequest request) async {
-          debugPrint(
-              '>>>> ModelViewer wants to load: <${request.url}>'); // DEBUG
-          if (!Platform.isAndroid) {
-            if (Platform.isIOS && request.url == widget.iosSrc) {
-              // TODO: Migrate to launchUrl()
-              await launch(
-                request.url,
-                forceSafariVC: true,
-              );
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          }
-          if (!request.url.startsWith("intent://")) {
-            return NavigationDecision.navigate;
-          }
-          try {
-            // Original, just keep as a backup
-            // See: https://developers.google.com/ar/develop/java/scene-viewer
-            // final intent = android_content.AndroidIntent(
-            //   action: "android.intent.action.VIEW", // Intent.ACTION_VIEW
-            //   data: "https://arvr.google.com/scene-viewer/1.0",
-            //   arguments: <String, dynamic>{
-            //     'file': widget.src,
-            //     'mode': 'ar_preferred',
-            //   },
-            //   package: "com.google.ar.core",
-            //   flags: <int>[
-            //     Flag.FLAG_ACTIVITY_NEW_TASK
-            //   ], // Intent.FLAG_ACTIVITY_NEW_TASK,
-            // );
-
-            // 2022-03-14 update
-            final String fileURL;
-            if (['http', 'https'].contains(Uri.parse(widget.src).scheme)) {
-              fileURL = widget.src;
-            } else {
-              fileURL = p.joinAll([_proxyURL, 'model']);
-            }
-            final intent = android_content.AndroidIntent(
-              action: "android.intent.action.VIEW",
-              // Intent.ACTION_VIEW
-              // See https://developers.google.com/ar/develop/scene-viewer#3d-or-ar
-              // data should be something like "https://arvr.google.com/scene-viewer/1.0?file=https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF/Avocado.gltf"
-              data: Uri(
-                  scheme: 'https',
-                  host: 'arvr.google.com',
-                  path: '/scene-viewer/1.0',
-                  queryParameters: {
-                    // 'title': '', // TODO: maybe set by the user
-                    // TODO: further test, and make it 'ar_preferred'
-                    'mode': 'ar_preferred',
-                    'file': fileURL,
-                  }).toString(),
-              // package changed to com.google.android.googlequicksearchbox
-              // to support the widest possible range of devices
-              package: "com.google.android.googlequicksearchbox",
-              arguments: <String, dynamic>{
-                'browser_fallback_url':
-                    'market://details?id=com.google.android.googlequicksearchbox'
-              },
-            );
-            await intent.launch().onError((error, stackTrace) {
-              debugPrint('>>>> ModelViewer Intent Error: $error'); // DEBUG
-            });
-          } catch (error) {
-            debugPrint('>>>> ModelViewer failed to launch AR: $error'); // DEBUG
-          }
-          return NavigationDecision.prevent;
-        },
-      ));
-    widget.javascriptChannels?.forEach((element) {
-      webViewController.addJavaScriptChannel(
-        element.name,
-        onMessageReceived: element.onMessageReceived,
-      );
-    });
-
-    debugPrint('>>>> ModelViewer initializing... <$_proxyURL>'); // DEBUG
-    widget.onWebViewCreated?.call(webViewController);
-    await webViewController.loadRequest(Uri.parse(_proxyURL));
-
-    setState(() {
-      _controller = webViewController;
-    });
   }
 
   Future<void> _initProxy() async {
