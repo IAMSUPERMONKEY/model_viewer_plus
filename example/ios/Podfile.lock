@@ -30,7 +30,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
-  flutter_inappwebview: 4fe74e5e65809c3d363febfd9e2b21aa79bb0f1c
+  flutter_inappwebview: 50b55a88f5dddadc9e741a7caf72f378116e2156
   OrderedSet: aaeb196f7fef5a9edf55d89760da9176ad40b93c
   url_launcher_ios: 08a3dfac5fb39e8759aeb0abbd5d9480f30fc8b4
 
