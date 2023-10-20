@@ -16,7 +16,9 @@ dependencies:
     sdk: flutter
   android_intent_plus: ^3.1.5
 #  webview_flutter: ^4.2.0
-  flutter_inappwebview: ^5.8.0
+  flutter_inappwebview:
+    git:
+     url: https://github.com/pichillilorenzo/flutter_inappwebview
   url_launcher: ^6.1.7
 dev_dependencies:
   flutter_test:

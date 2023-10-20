@@ -1,7 +1,6 @@
 <component name="libraryTable">
   <library name="Flutter Plugins" type="FlutterPluginsLibraryType">
     <CLASSES>
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/url_launcher_android-6.0.37" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/url_launcher_ios-6.1.4" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/url_launcher_web-2.0.18" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/url_launcher_macos-3.0.6" />
@@ -9,7 +8,8 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/url_launcher_windows-3.0.7" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/android_intent_plus-3.1.9" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/url_launcher-6.1.12" />
-      <root url="file://$USER_HOME$/.pub-cache/git/flutter_inappwebview-b00b3781ef48459cef127ff9071fb95615a1b88e" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/url_launcher_android-6.0.37" />
+      <root url="file://$USER_HOME$/.pub-cache/git/flutter_inappwebview-0157c8ec7cc1f45adf0b27adcea889f20deff483" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
